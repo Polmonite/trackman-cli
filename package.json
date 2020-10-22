@@ -1,0 +1,17 @@
+{
+  "name": "trackman-cli",
+  "version": "1.0.0",
+  "description": "A CLI app for tracking the time spent on activities during the day.",
+  "preferGlobal": true,
+  "author": "Andrea Longo",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^4.1.0",
+    "cli-table3": "^0.6.0",
+    "commander": "^6.1.0",
+    "inquirer": "^7.3.3"
+  },
+  "bin": {
+    "tman": "src/tman.js"
+  }
+}
