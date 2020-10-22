@@ -1,10 +1,14 @@
+<p align="center">
+    <img src=".misc/logo.png" height="125"/>
+</p>
+
 # TrackMan-CLI
 
 *A CLI app for tracking the time spent on activities during the day.*
 
 ## Overview
 
-**Trackman** (`tman`) allows you to quickly record when you started working on a
+**TrackMan-CLI** (`tman`) allows you to quickly record when you started working on a
 task, when you stopped and gives you a quick recap to read at the end of the day
 (or whenever you want).
 
