@@ -1,6 +1,13 @@
 const cmd = require('commander');
 const chalk = require('chalk');
-const { today, getDayDb, listAllTasks } = require('./utils');
+const {
+    today,
+    last,
+    getDayDb,
+    listAllTasksWithNames,
+    taskFilter,
+    ongoing,
+} = require('./utils');
 
 const log = console.log;
 
@@ -18,9 +25,33 @@ const args = cmd.args;
 const refDay = args[0] || today();
 const db = getDayDb(refDay);
 
-const tasks = listAllTasks(db, cmd.all, cmd.long);
-if (tasks.length > 0) {
-    log(tasks.join("\n"));
+const filter = cmd.all
+    ? null
+    : taskFilter(ongoing());
+
+const taskPairs = listAllTasksWithNames(db, filter);
+
+let output = [];
+for (let i in taskPairs) {
+    const { name: taskName, task } = taskPairs[i];
+    const slot = last(task.slots);
+    if (cmd.long) {
+        let status;
+        if (!slot.end) {
+            status = chalk.green("Ongoing ");
+        } else if (task.paused) {
+            status = chalk.magenta("Paused  ");
+        } else {
+            status = chalk.yellow("Stopped ");
+        }
+        output.push(status + "\t" + taskName);
+    } else {
+        output.push(taskName);
+    }
+}
+
+if (output.length > 0) {
+    log(output.join("\n"));
 } else {
     log("There are no tasks");
 }

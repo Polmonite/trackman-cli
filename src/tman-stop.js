@@ -1,7 +1,7 @@
 const cmd = require('commander');
 const chalk = require('chalk');
 const flow = require('inquirer');
-const { listAllTasks, today, getDayDb, setDayDb, stopTasks, stopAllTasks } = require('./utils');
+const { listAllTaskNames, today, getDayDb, setDayDb, stopTasks, stopAllTasks, taskFilter, ongoing } = require('./utils');
 
 const stopTasksAndUpdate = (tasks, day, db) => {
     stopTasks(db, tasks);
@@ -39,12 +39,13 @@ if (args.length > 0) {
 if (tasks.length > 0) {
     stopTasksAndUpdate(tasks, day, db);
 } else {
+    const ongoingTasks = listAllTaskNames(db, taskFilter(ongoing()));
     flow.prompt([
         {
             type: 'checkbox',
             message: chalk.cyan('Select which tasks to stop:'),
             name: 'tasks',
-            choices: listAllTasks(db).map((t) => {
+            choices: ongoingTasks.map((t) => {
                 return { name: t };
             })
         }

@@ -1,24 +1,24 @@
 const cmd = require('commander');
 const chalk = require('chalk');
 const flow = require('inquirer');
-const { now, last, today, listAllTasks, getDayDb, setDayDb, stopAllTasks } = require('./utils');
+const {
+    now,
+    last,
+    today,
+    listAllTaskNames,
+    getDayDb,
+    setDayDb,
+    stopAllTasks,
+    startTask,
+    taskFilter,
+    ongoing,
+} = require('./utils');
 
 const log = console.log;
 
-const startAndUpdate = (task, day, db, rightNow) => {
+const startAndUpdate = (taskName, day, db) => {
     // start or re-start task
-    if (!db[task]) {
-        db[task] = { slots: [ { start: rightNow } ] };
-        log(chalk.green(`"${task}" started at "${rightNow}"`));
-    } else {
-        let slot = last(db[task].slots);
-        if (slot.end) {
-            db[task].slots.push({ start: rightNow });
-            log(chalk.green(`"${task}" re-started at "${rightNow}"`));
-        } else {
-            console.error(chalk.red(`"${task}" is already in progress`));
-        }
-    }
+    db[taskName] = startTask(taskName);
 
     // update db
     setDayDb(day, db);
@@ -44,19 +44,26 @@ if (!args.length) {
 const task = args[0];
 
 const day = today();
-const rightNow = now();
 const db = getDayDb(day);
 
 if (cmd.parallel) {
-    startAndUpdate(task, day, db, rightNow);
-} else if (listAllTasks(db).length == 0) {
-    startAndUpdate(task, day, db, rightNow);
+    startAndUpdate(task, day, db);
+    return;
+}
+
+const ongoingTasks = listAllTaskNames(db, taskFilter(ongoing()));
+
+if (ongoingTasks.length == 0) {
+    startAndUpdate(task, day, db);
 } else if (cmd.force) {
     stopAllTasks(db, task);
-    startAndUpdate(task, day, db, rightNow);
+    startAndUpdate(task, day, db);
 } else {
     log(chalk.cyan("Currently ongoing tasks:"));
-    log(listAllTasks(db).map((t) => { return " - " + t; }).join("\n"));
+    const output = ongoingTasks.map((t) => {
+        return " - " + t;
+    }).join("\n")
+    log(output);
     flow.prompt([
         {
             type: 'confirm',
@@ -67,6 +74,6 @@ if (cmd.parallel) {
         if (answers.stopAllTask) {
             stopAllTasks(db, task);
         }
-        startAndUpdate(task, day, db, rightNow);
+        startAndUpdate(task, day, db);
     });
 }

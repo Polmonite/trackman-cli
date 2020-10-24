@@ -77,52 +77,273 @@ const listOfDbs = () => {
     });
 };
 
-const listAllTasks = (db, all, long) => {
-    all = all || false;
-    long = long || false;
+const _listAll = (db, filter, outputType) => {
+    filter = filter || always;
     let output = [];
-    for (let task in db) {
-        let slot = last(db[task].slots);
-        if (!slot.end || all) {
-            if (long) {
-                let status = (!slot.end)
-                    ? chalk.green("Ongoing ")
-                    : chalk.yellow("Stopped ");
-                output.push(status + "\t" + task);
-            } else {
+    for (let taskName in db) {
+        const task = db[taskName];
+        if (!filter(taskName, task)) {
+            continue;
+        }
+        switch (outputType) {
+            case 'task':
                 output.push(task);
-            }
+                break;
+            case 'name':
+                output.push(taskName);
+                break;
+            case 'pair':
+                output.push({
+                    name: taskName,
+                    task: task,
+                });
+                break;
+            default:
+                throw(`Unknown outputType "${outputType}"`);
         }
     }
     return output;
 };
 
-const stopAllTasks = (db, differentThanTask) => {
-    differentThanTask = differentThanTask || null;
-    for (let otherTask in db) {
-        if (otherTask === differentThanTask) {
-            continue;
-        }
-        let slot = last(db[otherTask].slots);
-        if (!slot.end) {
-            slot.end = now();
-            log(chalk.yellow(`"${otherTask}" ended at "${slot.end}"`));
-        }
-    }
+const listAllTasks = (db, filter) => {
+    return _listAll(db, filter, 'task');
 };
 
-const stopTasks = (db, tasks) => {
-    for (let taskIndex in tasks) {
-        const task = tasks[taskIndex];
-        if (typeof db[task] === 'undefined') {
-            console.error(chalk.red(`Unknown task "${task}"`));
+const listAllTaskNames = (db, filter) => {
+    return _listAll(db, filter, 'name');
+};
+
+const listAllTasksWithNames = (db, filter) => {
+    return _listAll(db, filter, 'pair');
+};
+
+const identity = (i) => {
+    return i;
+};
+
+const always = () => {
+    return true;
+};
+
+const never = () => {
+    return false;
+};
+
+//#region filters
+
+const tf = {
+
+    nameDifferentThan: (differentThanTask) => {
+        return (taskName, _t) => {
+            return taskName !== differentThanTask;
         }
-        let slot = last(db[task].slots);
-        if (!slot.end) {
+    },
+    
+    paused: () => {
+        return (_taskName, task) => {
+            return task.paused;
+        }
+    },
+    
+    notPaused: () => {
+        return (_taskName, task) => {
+            return !task.paused;
+        }
+    },
+    
+    notStopped: () => {
+        return (_taskName, task) => {
+            return !(last(task.slots).end);
+        }
+    },
+
+    ongoing: () => {
+        return (_taskName, task) => {
+            return !(last(task.slots).end);
+        }
+    },
+
+    stopped: () => {
+        return (_taskName, task) => {
+            return !!(last(task.slots).end);
+        }
+    },
+
+};
+
+//#endregion
+
+//#region task actions
+
+const ta = {
+
+    start: (taskName, task) => {
+        task = task || {};
+        if (!task.slots) {
+            task = { slots: [ { start: now() } ] };
+            log(chalk.green(`"${taskName}" started at "${now()}"`));
+        } else {
+            let slot = last(task.slots);
+            if (slot.end) {
+                task.slots.push({ start: now() });
+                log(chalk.green(`"${taskName}" re-started at "${now()}"`));
+            } else {
+                console.error(chalk.red(`"${taskName}" is already in progress`));
+            }
+        }
+        return task;
+    },
+
+    stop: (taskName, task) => {
+        let slot = last(task.slots);
+        if (!!slot.end) {
+            console.error(chalk.red(`"${taskName}" is already stopped`));
+        } else {
             slot.end = now();
-            log(chalk.yellow(`"${task}" ended at "${slot.end}"`));
+            log(chalk.yellow(`"${taskName}" stopped at "${slot.end}"`));
         }
-    }
+        return task;
+    },
+
+    pause: (taskName, task) => {
+        let slot = last(task.slots);
+        if (task.paused) {
+            console.error(chalk.red(`"${taskName}" is already paused`));
+        } else if (!!slot.end) {
+            console.error(chalk.red(`"${taskName}" is stopped and can't be paused`));
+        } else {
+            task.paused = true;
+            slot.end = now();
+            log(chalk.magenta(`"${taskName}" paused at "${slot.end}"`));
+        }
+        return task;
+    },
+
+    unpause: (taskName, task) => {
+        let slot = last(task.slots);
+        if (!task.paused) {
+            console.error(chalk.red(`"${taskName}" is not paused`));
+        } else {
+            delete task.paused;
+            slot.end = now();
+            log(chalk.green(`"${taskName}" un-paused at "${slot.end}"`));
+        }
+        return task;
+    },
+
+};
+
+//#endregion
+
+const taskFilter = function() {
+    const filters = arguments;
+    return (taskName, task) => {
+        for (let i in filters) {
+            if (!filters[i](taskName, task)) {
+                return false;
+            }
+        }
+        return true;
+    };
+};
+
+const applyTo = (db, tasks) => {
+    tasks = tasks || Object.keys(db);
+    let applier = {
+        _db: db,
+        _tasks: tasks,
+        _then: identity,
+        _else: identity,
+        _if: always,
+        then: (fn) => {
+            applier._then = fn;
+            return applier;
+        },
+        action: (fn) => {
+            applier._then = fn;
+            return applier;
+        },
+        else: (fn) => {
+            applier._else = fn;
+            return applier;
+        },
+        if: (fn) => {
+            applier._if = fn;
+            return applier;
+        },
+        do: () => {
+            for (let i in tasks) {
+                const taskName = tasks[i];
+                if (typeof db[taskName] === 'undefined') {
+                    console.error(chalk.red(`Unknown task "${taskName}"`));
+                    continue;
+                } else if (applier._if(taskName, db[taskName])) {
+                    applier._then(taskName, db[taskName]);
+                } else {
+                    applier._else(taskName, db[taskName]);
+                }
+            }
+        },
+    };
+    return applier;
+};
+
+const stopAllTasks = (db, differentThanTask) => {
+    differentThanTask = differentThanTask || null;
+    applyTo(db)
+        .if(
+            taskFilter(
+                tf.nameDifferentThan(differentThanTask),
+                tf.notStopped()
+            )
+        )
+        .then(ta.stop)
+        .do();
+}
+
+const pauseAllTasks = (db, differentThanTask) => {
+    differentThanTask = differentThanTask || null;
+    applyTo(db)
+        .if(
+            taskFilter(
+                tf.nameDifferentThan(differentThanTask),
+                tf.notPaused(),
+                tf.notStopped()
+            )
+        ) 
+        .then(ta.pause)
+        .do();
+}
+
+const unpauseAllTasks = (db, differentThanTask) => {
+    differentThanTask = differentThanTask || null;
+    applyTo(db)
+        .if(
+            taskFilter(
+                tf.nameDifferentThan(differentThanTask),
+                tf.paused()
+            )
+        )
+        .then(ta.unpause)
+        .do();
+}
+
+const stopTasks = (db, tasks) => {
+    applyTo(db, tasks)
+        .action(ta.stop)
+        .do();
+};
+
+const pauseTasks = (db, tasks) => {
+    applyTo(db, tasks)
+        .action(ta.pause)
+        .do();
+};
+
+const unpauseTasks = (db, tasks) => {
+    applyTo(db, tasks)
+        .action(ta.unpause)
+        .do();
 };
 
 module.exports = {
@@ -138,6 +359,21 @@ module.exports = {
     getDayDb,
     listOfDbs,
     listAllTasks,
+    listAllTaskNames,
+    listAllTasksWithNames,
     stopAllTasks,
+    pauseAllTasks,
+    unpauseAllTasks,
     stopTasks,
+    pauseTasks,
+    unpauseTasks,
+  
+    taskFilter,
+
+    ...tf,
+
+    startTask: ta.start,
+    stopTask: ta.stop,
+    pauseTask: ta.pause,
+    unpauseTask: ta.unpause,
 };
