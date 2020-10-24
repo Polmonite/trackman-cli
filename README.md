@@ -8,9 +8,9 @@
 
 ## Overview
 
-**TrackMan-CLI** (`tman`) allows you to quickly record when you started working on a
-task, when you stopped and gives you a quick recap to read at the end of the day
-(or whenever you want).
+**TrackMan-CLI** (`tman`) allows you to quickly record when you started working
+on a task, when you stopped and gives you a quick recap to read at the end of
+the day (or whenever you want).
 
 ## Table of contents
 
@@ -264,12 +264,21 @@ $ tman [cmd] --help
 - [x] Understand the differences between Java and JavaScript;
 - [x] Forget previous point;
 - [x] Implement `start`/`stop` commands;
+  - [ ] Add option to start/stop task in a moment in the past
 - [x] Implement `recap` command;
 - [x] Implement `report` command;
 - [x] Implement `list` command;
 - [x] Implement `config` command;
+  - [ ] Add `locale` and `display_format` configs for recorder times;
+  - [ ] Add `boundaries` config (to ignore task tracked outside of a given range
+  of time);
+  - [ ] Add `breaks` config (to set daily time breaks, like lunch, coffee break,
+  etc. which will be ignored in the daily recap);
+- [x] Implement `pause`/`unpause` command (to pause/unpause ongoing tasks them);
+- [ ] Implement `add` command (to add whole task, with begin and end date);
 - [ ] Implement `edit` command (to edit recorded tasks);
 - [ ] Implement `delete` command (to delete recorded tasks);
+- [ ] Try using a sqlite db instead of json files;
 - [ ] Create a gui for those who sometimes aren't inside the terminal (like me);
 - [ ] Learn english language (optionale).
 
